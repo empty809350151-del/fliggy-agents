@@ -2331,7 +2331,8 @@ class WalkerCharacter {
     func enterPause() {
         isWalking = false
         isPaused = true
-        let delay = Double.random(in: 5.0...12.0)
+        // Keep the desktop characters feeling alive between walk loops.
+        let delay = Double.random(in: 2.0...4.5)
         pauseEndTime = CACurrentMediaTime() + delay
         refreshMotionPlaybackState()
     }
@@ -2339,17 +2340,27 @@ class WalkerCharacter {
     func updateFlip() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        if goingRight {
-            playerLayer.transform = CATransform3DIdentity
-        } else {
+        if CharacterFacingPresentation.shouldMirrorPose(
+            state: currentMotionState,
+            playbackMode: currentMotionPlaybackMode,
+            isWalking: isWalking,
+            goingRight: goingRight
+        ) {
             playerLayer.transform = CATransform3DMakeScale(-1, 1, 1)
+        } else {
+            playerLayer.transform = CATransform3DIdentity
         }
         playerLayer.frame = CGRect(x: 0, y: 0, width: displayWidth, height: displayHeight)
         CATransaction.commit()
     }
 
     var currentFlipCompensation: CGFloat {
-        goingRight ? 0 : flipXOffset
+        CharacterFacingPresentation.shouldMirrorPose(
+            state: currentMotionState,
+            playbackMode: currentMotionPlaybackMode,
+            isWalking: isWalking,
+            goingRight: goingRight
+        ) ? flipXOffset : 0
     }
 
     func beginDrag(screenPoint: NSPoint) {

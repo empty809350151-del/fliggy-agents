@@ -57,10 +57,10 @@ class FliggyAgentsController {
         char3.positionProgress = 0.62
         char4.positionProgress = 0.86
 
-        char1.pauseEndTime = CACurrentMediaTime() + Double.random(in: 0.5...2.0)
-        char2.pauseEndTime = CACurrentMediaTime() + Double.random(in: 8.0...14.0)
-        char3.pauseEndTime = CACurrentMediaTime() + Double.random(in: 4.0...9.0)
-        char4.pauseEndTime = CACurrentMediaTime() + Double.random(in: 2.0...7.0)
+        char1.pauseEndTime = CACurrentMediaTime() + Double.random(in: 0.4...1.4)
+        char2.pauseEndTime = CACurrentMediaTime() + Double.random(in: 1.0...2.4)
+        char3.pauseEndTime = CACurrentMediaTime() + Double.random(in: 0.8...2.2)
+        char4.pauseEndTime = CACurrentMediaTime() + Double.random(in: 1.8...3.4)
 
         char1.setup()
         char2.setup()

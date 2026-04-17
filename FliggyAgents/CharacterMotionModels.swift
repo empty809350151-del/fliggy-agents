@@ -219,6 +219,27 @@ enum CharacterMotionPlaybackTransition {
     }
 }
 
+enum CharacterFacingPresentation {
+    static func shouldMirrorPose(
+        state: CharacterMotionState,
+        playbackMode: CharacterMotionPlaybackMode?,
+        isWalking: Bool,
+        goingRight: Bool
+    ) -> Bool {
+        guard !goingRight else { return false }
+
+        if playbackMode == .holdFirstFrame {
+            return false
+        }
+
+        if state == .locomotion && !isWalking {
+            return false
+        }
+
+        return true
+    }
+}
+
 struct CharacterMotionContext: Equatable {
     var isPopoverOpen: Bool
     var isDragging: Bool

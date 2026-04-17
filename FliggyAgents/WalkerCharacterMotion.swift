@@ -43,6 +43,10 @@ extension WalkerCharacter {
         motionRuntime.currentStateStartedAt
     }
 
+    var currentMotionPlaybackMode: CharacterMotionPlaybackMode? {
+        motionRuntime.currentPlaybackMode
+    }
+
     func initializeMotionSystem() {
         motionRuntime.assetCatalog = CharacterMotionAssetCatalog(videoName: videoName)
         motionRuntime.currentState = .locomotion
@@ -189,6 +193,7 @@ extension WalkerCharacter {
 
     func refreshMotionPlaybackState() {
         guard let playbackMode = motionRuntime.currentPlaybackMode else { return }
+        updateFlip()
         switch playbackMode {
         case .holdFirstFrame:
             queuePlayer.pause()
