@@ -331,6 +331,7 @@ class WalkerCharacter {
         guard isManuallyVisible else { return }
 
         window.orderFrontRegardless()
+        healAfterEnvironmentRefresh(forcePlayerRebuild: true)
         if isWalking {
             queuePlayer.play()
         }

@@ -224,9 +224,57 @@ extension WalkerCharacter {
         }
     }
 
-    private func configurePlayerIfNeeded(descriptor: CharacterMotionClipDescriptor, suppressedByPopover: Bool) {
+    func healAfterEnvironmentRefresh(forcePlayerRebuild: Bool = false) {
+        guard let hostView = window.contentView else { return }
+
+        hostView.wantsLayer = true
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if playerLayer.superlayer !== hostView.layer {
+            playerLayer.removeFromSuperlayer()
+            hostView.layer?.addSublayer(playerLayer)
+        }
+        playerLayer.player = queuePlayer
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.clear.cgColor
+        playerLayer.frame = hostView.bounds
+        CATransaction.commit()
+
+        let shouldRebuildPlayer = forcePlayerRebuild
+            || queuePlayer.currentItem == nil
+            || queuePlayer.items().isEmpty
+
+        if let descriptor = motionRuntime.currentClipDescriptor {
+            configurePlayerIfNeeded(
+                descriptor: descriptor,
+                suppressedByPopover: motionRuntime.isSuppressedByPopover,
+                forceRebuild: shouldRebuildPlayer
+            )
+        } else if shouldRebuildPlayer,
+                  let descriptor = motionDescriptor(for: currentMotionState, previousState: currentMotionState) {
+            configurePlayerIfNeeded(
+                descriptor: descriptor,
+                suppressedByPopover: motionRuntime.isSuppressedByPopover,
+                forceRebuild: true
+            )
+        }
+
+        refreshMotionPlaybackState()
+        playerLayer.setNeedsDisplay()
+        hostView.layer?.setNeedsDisplay()
+        hostView.needsDisplay = true
+        window.displayIfNeeded()
+        window.invalidateShadow()
+    }
+
+    private func configurePlayerIfNeeded(
+        descriptor: CharacterMotionClipDescriptor,
+        suppressedByPopover: Bool,
+        forceRebuild: Bool = false
+    ) {
         let effectiveMode: CharacterMotionPlaybackMode = suppressedByPopover ? .holdFirstFrame : descriptor.playbackMode
-        if !CharacterMotionPlaybackTransition.requiresPlayerRebuild(
+        if !forceRebuild && !CharacterMotionPlaybackTransition.requiresPlayerRebuild(
             currentResourceName: motionRuntime.currentResourceName,
             currentPlaybackMode: motionRuntime.currentPlaybackMode,
             nextDescriptor: descriptor,
