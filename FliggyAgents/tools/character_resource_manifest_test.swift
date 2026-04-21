@@ -18,6 +18,9 @@ enum CharacterResourceManifestTest {
             "walk-fliggy-01.mov",
             "walk-labubu-01.mov"
         ]
+        let optionalReferencedVideos = [
+            "context-menu-enter-fliggy-01.mov"
+        ]
 
         for video in expectedVideos {
             let sourceURL = lilAgentsDirectory.appendingPathComponent(video)
@@ -36,6 +39,20 @@ enum CharacterResourceManifestTest {
             expect(
                 projectText.contains("\(video) in Resources"),
                 "\(video) is not included in the Resources build phase"
+            )
+        }
+
+        for video in optionalReferencedVideos {
+            let sourceURL = lilAgentsDirectory.appendingPathComponent(video)
+            guard FileManager.default.fileExists(atPath: sourceURL.path) else { continue }
+
+            expect(
+                projectText.contains(video),
+                "project.pbxproj does not reference optional asset \(video)"
+            )
+            expect(
+                projectText.contains("\(video) in Resources"),
+                "optional asset \(video) is not included in the Resources build phase"
             )
         }
 

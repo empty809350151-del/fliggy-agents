@@ -1347,6 +1347,7 @@ class WalkerCharacter {
         skillOrbitWindow?.setFrame(initialSkillOrbitFrame(for: currentFrame), display: false)
         skillOrbitWindow?.alphaValue = 1
         skillOrbitWindow?.orderFrontRegardless()
+        syncMotionStateImmediately()
 
         removeSkillOrbitEventMonitors()
         skillOrbitClickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in

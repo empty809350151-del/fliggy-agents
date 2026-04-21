@@ -29,6 +29,7 @@ enum CharacterMotionPlaybackMode: Equatable {
     case loop
     case oneShot
     case holdFirstFrame
+    case holdLastFrame
 }
 
 enum CharacterMotionClipKind: CaseIterable, Equatable {
@@ -211,9 +212,15 @@ enum CharacterMotionPlaybackTransition {
         switch (currentPlaybackMode, nextPlaybackMode) {
         case (.loop, .holdFirstFrame), (.holdFirstFrame, .loop):
             return true
+        case (.oneShot, .holdLastFrame), (.holdLastFrame, .oneShot):
+            return true
+        case (.holdLastFrame, .holdLastFrame):
+            return true
         case (.holdFirstFrame, .holdFirstFrame), (.loop, .loop), (.oneShot, .oneShot):
             return true
         case (.loop, .oneShot), (.oneShot, .loop), (.holdFirstFrame, .oneShot), (.oneShot, .holdFirstFrame):
+            return false
+        case (.loop, .holdLastFrame), (.holdLastFrame, .loop), (.holdFirstFrame, .holdLastFrame), (.holdLastFrame, .holdFirstFrame):
             return false
         }
     }
@@ -226,6 +233,13 @@ enum CharacterFacingPresentation {
         isWalking: Bool,
         goingRight: Bool
     ) -> Bool {
+        switch state {
+        case .contextMenuEnter, .contextMenuIdle:
+            return false
+        case .locomotion, .hover, .dragging, .edgeDockLeft, .edgeDockRight, .thinking, .messagePrompt:
+            break
+        }
+
         guard !goingRight else { return false }
 
         if playbackMode == .holdFirstFrame {
@@ -258,6 +272,7 @@ struct CharacterMotionClipDescriptor: Equatable {
     let resourceName: String
     let playbackMode: CharacterMotionPlaybackMode
     let usesFallback: Bool
+    let duration: CFTimeInterval?
 }
 
 struct CharacterMotionResolution: Equatable {

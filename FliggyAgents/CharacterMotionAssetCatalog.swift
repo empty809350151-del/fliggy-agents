@@ -1,9 +1,11 @@
+import AVFoundation
 import Foundation
 
 struct CharacterMotionAssetCatalog {
     private let locomotionResourceName: String
     private let descriptors: [CharacterMotionClipKind: CharacterMotionClipDescriptor]
     private let resourceURLs: [String: URL]
+    private let resourceDurations: [String: CFTimeInterval]
 
     init(videoName: String, bundle: Bundle = .main) {
         let locomotionResourceName = videoName
@@ -11,6 +13,7 @@ struct CharacterMotionAssetCatalog {
 
         var availableNames = Set<String>()
         var resourceURLs: [String: URL] = [:]
+        var resourceDurations: [String: CFTimeInterval] = [:]
         for kind in CharacterMotionClipKind.allCases {
             let name = kind == .locomotionLoop
                 ? locomotionResourceName
@@ -18,34 +21,40 @@ struct CharacterMotionAssetCatalog {
             if let url = bundle.url(forResource: name, withExtension: "mov") {
                 availableNames.insert(name)
                 resourceURLs[name] = url
+                resourceDurations[name] = Self.duration(for: url)
             }
         }
 
         self.init(
             locomotionResourceName: locomotionResourceName,
             availableResourceNames: availableNames,
-            resourceURLs: resourceURLs
+            resourceURLs: resourceURLs,
+            resourceDurations: resourceDurations
         )
     }
 
     init(
         locomotionResourceName: String,
-        availableResourceNames: Set<String>
+        availableResourceNames: Set<String>,
+        resourceDurations: [String: CFTimeInterval] = [:]
     ) {
         self.init(
             locomotionResourceName: locomotionResourceName,
             availableResourceNames: availableResourceNames,
-            resourceURLs: [:]
+            resourceURLs: [:],
+            resourceDurations: resourceDurations
         )
     }
 
     private init(
         locomotionResourceName: String,
         availableResourceNames: Set<String>,
-        resourceURLs: [String: URL]
+        resourceURLs: [String: URL],
+        resourceDurations: [String: CFTimeInterval]
     ) {
         self.locomotionResourceName = locomotionResourceName
         self.resourceURLs = resourceURLs
+        self.resourceDurations = resourceDurations
 
         let characterBaseName = Self.characterBaseName(from: locomotionResourceName)
         var descriptors: [CharacterMotionClipKind: CharacterMotionClipDescriptor] = [:]
@@ -56,7 +65,8 @@ struct CharacterMotionAssetCatalog {
                     kind: kind,
                     resourceName: locomotionResourceName,
                     playbackMode: .loop,
-                    usesFallback: false
+                    usesFallback: false,
+                    duration: resourceDurations[locomotionResourceName]
                 )
                 continue
             }
@@ -67,14 +77,16 @@ struct CharacterMotionAssetCatalog {
                     kind: kind,
                     resourceName: explicitName,
                     playbackMode: kind.defaultPlaybackMode,
-                    usesFallback: false
+                    usesFallback: false,
+                    duration: resourceDurations[explicitName]
                 )
             } else {
                 descriptors[kind] = CharacterMotionClipDescriptor(
                     kind: kind,
                     resourceName: locomotionResourceName,
                     playbackMode: .holdFirstFrame,
-                    usesFallback: true
+                    usesFallback: true,
+                    duration: nil
                 )
             }
         }
@@ -87,7 +99,8 @@ struct CharacterMotionAssetCatalog {
             kind: kind,
             resourceName: locomotionResourceName,
             playbackMode: .holdFirstFrame,
-            usesFallback: true
+            usesFallback: true,
+            duration: nil
         )
     }
 
@@ -134,5 +147,12 @@ struct CharacterMotionAssetCatalog {
             name = String(name.dropLast(3))
         }
         return name
+    }
+
+    private static func duration(for url: URL) -> CFTimeInterval {
+        let asset = AVURLAsset(url: url)
+        let seconds = CMTimeGetSeconds(asset.duration)
+        guard seconds.isFinite, seconds > 0 else { return 0 }
+        return seconds
     }
 }

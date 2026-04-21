@@ -52,6 +52,7 @@ class KeyableWindow: NSWindow {
 class CharacterContentView: NSView {
     weak var character: WalkerCharacter?
     private static let hoverExitGracePeriod: CFTimeInterval = 0.12
+    private static let characterHoverEnabled = false
     private var isFileDropTargeted = false {
         didSet { updateDropAppearance() }
     }
@@ -70,10 +71,21 @@ class CharacterContentView: NSView {
         registerForDraggedTypes([.fileURL])
     }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverTrackingArea {
             removeTrackingArea(hoverTrackingArea)
+            self.hoverTrackingArea = nil
+        }
+        guard Self.characterHoverEnabled else {
+            cancelPendingHoverExit()
+            pendingHoverExitDeadline = nil
+            setHoverState(false)
+            return
         }
         let trackingArea = NSTrackingArea(
             rect: bounds,
@@ -108,6 +120,7 @@ class CharacterContentView: NSView {
     }
 
     func isMouseOverInteractiveContent() -> Bool {
+        guard Self.characterHoverEnabled else { return false }
         guard let window else { return false }
         let windowPoint = convert(window.mouseLocationOutsideOfEventStream, from: nil)
         return isInteractivePoint(windowPoint)
@@ -120,6 +133,12 @@ class CharacterContentView: NSView {
     }
 
     private func syncHoverState(withWindowPoint point: NSPoint, forceExit: Bool = false) {
+        guard Self.characterHoverEnabled else {
+            cancelPendingHoverExit()
+            pendingHoverExitDeadline = nil
+            setHoverState(false)
+            return
+        }
         let localPoint = convert(point, from: nil)
         applyHoverResolution(
             wantsHover: isInteractivePoint(localPoint),
@@ -263,6 +282,15 @@ class CharacterContentView: NSView {
     }
 
     override func rightMouseUp(with event: NSEvent) {
+        syncHoverState(withWindowPoint: event.locationInWindow)
+        character?.handleSecondaryClick()
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard event.buttonNumber == 2 else {
+            super.otherMouseUp(with: event)
+            return
+        }
         syncHoverState(withWindowPoint: event.locationInWindow)
         character?.handleSecondaryClick()
     }

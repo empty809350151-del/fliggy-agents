@@ -145,7 +145,7 @@ extension WalkerCharacter {
             isPaused = true
         }
 
-        if let descriptor = motionRuntime.assetCatalog?.descriptor(for: resolution.state.clipKind) {
+        if let descriptor = motionDescriptor(for: resolution.state, previousState: previousState) {
             configurePlayerIfNeeded(descriptor: descriptor, suppressedByPopover: resolution.isSuppressedByPopover)
         }
         refreshMotionPlaybackState()
@@ -194,13 +194,16 @@ extension WalkerCharacter {
     func refreshMotionPlaybackState() {
         guard let playbackMode = motionRuntime.currentPlaybackMode else { return }
         updateFlip()
+        applyPlaybackBoundaryBehavior(for: playbackMode)
         switch playbackMode {
         case .holdFirstFrame:
             queuePlayer.pause()
-            queuePlayer.seek(to: .zero)
+            seekPrecisely(to: .zero)
+        case .holdLastFrame:
+            holdCurrentClipLastFrame()
         case .oneShot:
             if !motionRuntime.hasStartedCurrentOneShotPlayback {
-                queuePlayer.seek(to: .zero)
+                seekPrecisely(to: .zero)
                 queuePlayer.play()
                 motionRuntime.hasStartedCurrentOneShotPlayback = true
             }
@@ -210,11 +213,11 @@ extension WalkerCharacter {
                     queuePlayer.play()
                 } else {
                     queuePlayer.pause()
-                    queuePlayer.seek(to: .zero)
+                    seekPrecisely(to: .zero)
                 }
             } else if isIdleForPopover {
                 queuePlayer.pause()
-                queuePlayer.seek(to: .zero)
+                seekPrecisely(to: .zero)
             } else {
                 queuePlayer.play()
             }
@@ -246,14 +249,41 @@ extension WalkerCharacter {
 
         looper = nil
         queuePlayer.removeAllItems()
+        applyPlaybackBoundaryBehavior(for: effectiveMode)
 
         let item = AVPlayerItem(asset: AVAsset(url: url))
         switch effectiveMode {
         case .loop:
             looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
-        case .oneShot, .holdFirstFrame:
+        case .oneShot, .holdFirstFrame, .holdLastFrame:
             queuePlayer.insert(item, after: nil)
         }
+    }
+
+    private func motionDescriptor(
+        for state: CharacterMotionState,
+        previousState: CharacterMotionState
+    ) -> CharacterMotionClipDescriptor? {
+        guard let descriptor = motionRuntime.assetCatalog?.descriptor(for: state.clipKind) else {
+            return nil
+        }
+
+        if state == .contextMenuIdle,
+           descriptor.usesFallback,
+           previousState == .contextMenuEnter,
+           let currentDescriptor = motionRuntime.currentClipDescriptor,
+           currentDescriptor.kind == .contextMenuEnterOnce,
+           !currentDescriptor.usesFallback {
+            return CharacterMotionClipDescriptor(
+                kind: currentDescriptor.kind,
+                resourceName: currentDescriptor.resourceName,
+                playbackMode: .holdLastFrame,
+                usesFallback: true,
+                duration: currentDescriptor.duration
+            )
+        }
+
+        return descriptor
     }
 
     private func resolvedEdgeSide(now: CFTimeInterval) -> CharacterEdgeSide? {
@@ -294,6 +324,12 @@ extension WalkerCharacter {
     }
 
     private func oneShotDuration(for state: CharacterMotionState) -> CFTimeInterval {
+        if let clipDuration = motionRuntime.currentClipDescriptor?.duration,
+           motionRuntime.currentClipDescriptor?.playbackMode == .oneShot,
+           clipDuration > 0 {
+            return clipDuration
+        }
+
         switch state {
         case .hover:
             return 0.4
@@ -304,5 +340,51 @@ extension WalkerCharacter {
         case .locomotion, .dragging, .contextMenuIdle, .edgeDockLeft, .edgeDockRight, .thinking:
             return 0
         }
+    }
+
+    private func applyPlaybackBoundaryBehavior(for playbackMode: CharacterMotionPlaybackMode) {
+        switch playbackMode {
+        case .loop:
+            queuePlayer.actionAtItemEnd = .advance
+        case .oneShot, .holdFirstFrame, .holdLastFrame:
+            queuePlayer.actionAtItemEnd = .pause
+        }
+    }
+
+    private func holdCurrentClipLastFrame() {
+        queuePlayer.pause()
+        guard let tailTime = currentClipTailTime() else { return }
+
+        let currentSeconds = CMTimeGetSeconds(queuePlayer.currentTime())
+        let tailSeconds = CMTimeGetSeconds(tailTime)
+        let isAlreadyAtTail = currentSeconds.isFinite
+            && tailSeconds.isFinite
+            && abs(currentSeconds - tailSeconds) <= (1.0 / 600.0)
+
+        if !isAlreadyAtTail {
+            seekPrecisely(to: tailTime)
+        }
+    }
+
+    private func currentClipTailTime() -> CMTime? {
+        let durationSeconds: Double
+        if let clipDuration = motionRuntime.currentClipDescriptor?.duration, clipDuration > 0 {
+            durationSeconds = clipDuration
+        } else if let currentItem = queuePlayer.currentItem {
+            let itemDuration = CMTimeGetSeconds(currentItem.duration)
+            guard itemDuration.isFinite, itemDuration > 0 else { return nil }
+            durationSeconds = itemDuration
+        } else {
+            return nil
+        }
+
+        let preferredTimescale: CMTimeScale = 600
+        let frameEpsilon = 1.0 / Double(preferredTimescale)
+        let tailSeconds = max(durationSeconds - frameEpsilon, 0)
+        return CMTime(seconds: tailSeconds, preferredTimescale: preferredTimescale)
+    }
+
+    private func seekPrecisely(to time: CMTime) {
+        queuePlayer.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 }
