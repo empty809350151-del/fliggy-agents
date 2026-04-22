@@ -25,6 +25,10 @@ private enum WalkerCharacterMotionRuntimeStore {
 }
 
 extension WalkerCharacter {
+    private var isMotionDebugLoggingEnabled: Bool {
+        ProcessInfo.processInfo.environment["FLIGGY_AGENTS_DEBUG_ORBIT_LOGS"] == "1"
+    }
+
     private var motionRuntime: WalkerCharacterMotionRuntime {
         let key = ObjectIdentifier(self)
         if let existing = WalkerCharacterMotionRuntimeStore.runtimes[key] {
@@ -148,11 +152,34 @@ extension WalkerCharacter {
         if let descriptor = motionDescriptor(for: resolution.state, previousState: previousState) {
             configurePlayerIfNeeded(descriptor: descriptor, suppressedByPopover: resolution.isSuppressedByPopover)
         }
+        if isMotionDebugLoggingEnabled {
+            NSLog(
+                "WalkerCharacter[%@] motion %@ -> %@ resource=%@ playback=%@ suppressed=%@ orbitVisible=%@",
+                videoName,
+                String(describing: previousState),
+                String(describing: resolution.state),
+                motionRuntime.currentResourceName ?? "nil",
+                String(describing: motionRuntime.currentPlaybackMode),
+                resolution.isSuppressedByPopover.description,
+                (skillOrbitWindow?.isVisible == true).description
+            )
+        }
         refreshMotionPlaybackState()
     }
 
     func syncMotionStateImmediately(at now: CFTimeInterval = CACurrentMediaTime()) {
         updateMotionState(now: now)
+    }
+
+    func forceResolveMotionStateImmediately(at now: CFTimeInterval = CACurrentMediaTime()) {
+        guard queuePlayer != nil else { return }
+        let context = updateMotionContext(now: now)
+        let resolution = motionRuntime.stateMachine.resolveNextState(
+            context: context,
+            previousState: currentMotionState,
+            now: now
+        )
+        applyMotionResolution(resolution, now: now)
     }
 
     func updateMotionState(now: CFTimeInterval) {

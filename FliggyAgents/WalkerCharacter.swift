@@ -173,6 +173,7 @@ class WalkerCharacter {
     private var skillOrbitCurrentAnchor = CGPoint(x: 146, y: 62)
     private var isAnimatingSkillOrbitPresentation = false
     private var isAnimatingSkillOrbitButtons = false
+    private var areSkillOrbitButtonsExpanded = false
     private var hoveredSkillOrbitButtonIndex: Int?
     private var transientBubbleState: TransientBubbleState?
 
@@ -234,6 +235,15 @@ class WalkerCharacter {
 
     init(videoName: String) {
         self.videoName = videoName
+    }
+
+    private var isSkillOrbitDebugLoggingEnabled: Bool {
+        ProcessInfo.processInfo.environment["FLIGGY_AGENTS_DEBUG_ORBIT_LOGS"] == "1"
+    }
+
+    private func logSkillOrbitDebug(_ message: String) {
+        guard isSkillOrbitDebugLoggingEnabled else { return }
+        NSLog("WalkerCharacter[%@] %@", videoName, message)
     }
 
     // MARK: - Setup
@@ -379,6 +389,7 @@ class WalkerCharacter {
     }
 
     func handleSecondaryClick() {
+        logSkillOrbitDebug("handleSecondaryClick orbitVisible=\(skillOrbitWindow?.isVisible == true) motionState=\(currentMotionState)")
         if dragDidMove {
             dragDidMove = false
             return
@@ -404,7 +415,7 @@ class WalkerCharacter {
         isPaused = true
         pauseEndTime = CACurrentMediaTime() + Double.random(in: 1.2...2.8)
         refreshMotionPlaybackState()
-        syncMotionStateImmediately()
+        forceResolveMotionStateImmediately()
     }
 
     func handleExternalFileDrop(_ urls: [URL]) {
@@ -1327,12 +1338,14 @@ class WalkerCharacter {
     }
 
     private func openSkillOrbit() {
+        logSkillOrbitDebug("openSkillOrbit.begin motionState=\(currentMotionState)")
         if let siblings = controller?.characters {
             for sibling in siblings where sibling !== self {
                 sibling.closeSkillOrbit(animated: false)
             }
         }
 
+        areSkillOrbitButtonsExpanded = false
         if isIdleForPopover {
             closePopover()
         }
@@ -1371,11 +1384,15 @@ class WalkerCharacter {
         let finalLayout = skillOrbitLayout(for: currentFrame)
         animateSkillOrbitPresentation(to: finalLayout) { [weak self] in
             self?.animateSkillOrbit(expanding: true, completion: nil)
+            self?.areSkillOrbitButtonsExpanded = true
+            self?.logSkillOrbitDebug("openSkillOrbit.presented motionState=\(String(describing: self?.currentMotionState))")
         }
     }
 
     private func closeSkillOrbit(animated: Bool, completion: (() -> Void)? = nil) {
+        logSkillOrbitDebug("closeSkillOrbit.begin animated=\(animated) motionState=\(currentMotionState)")
         guard skillOrbitWindow?.isVisible == true else {
+            areSkillOrbitButtonsExpanded = false
             completion?()
             return
         }
@@ -1384,6 +1401,7 @@ class WalkerCharacter {
         skillOrbitButtons.forEach { $0.resetHoverState() }
         hoveredSkillOrbitButtonIndex = nil
         updateSkillOrbitHoverLabel(text: nil, visible: false)
+        areSkillOrbitButtonsExpanded = false
         if animated {
             animateSkillOrbit(expanding: false) { [weak self] in
                 guard let self else {
@@ -1393,6 +1411,7 @@ class WalkerCharacter {
                 self.animateSkillOrbitReturnToDockPosition {
                     self.skillOrbitWindow?.orderOut(nil)
                     self.exitSkillOrbitIdleState()
+                    self.logSkillOrbitDebug("closeSkillOrbit.completed motionState=\(self.currentMotionState)")
                     completion?()
                 }
             }
@@ -1400,6 +1419,7 @@ class WalkerCharacter {
             cancelSkillOrbitAnimations()
             skillOrbitWindow?.orderOut(nil)
             exitSkillOrbitIdleState()
+            logSkillOrbitDebug("closeSkillOrbit.completed motionState=\(currentMotionState)")
             completion?()
         }
     }
@@ -1688,7 +1708,7 @@ class WalkerCharacter {
         skillOrbitCurrentAnchor = layout.orbitAnchor
         window.setFrameOrigin(layout.characterOrigin)
         orbit.setFrame(layout.orbitFrame, display: false)
-        if syncButtonsToExpandedState {
+        if syncButtonsToExpandedState && areSkillOrbitButtonsExpanded {
             syncSkillOrbitButtonsToExpandedState(anchor: layout.orbitAnchor)
         }
     }

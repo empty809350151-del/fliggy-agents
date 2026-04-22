@@ -126,8 +126,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openDebugSkillOrbitIfNeeded() {
         guard ProcessInfo.processInfo.environment["FLIGGY_AGENTS_DEBUG_OPEN_ORBIT"] == "1" else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.controller?.characters.first(where: \.isManuallyVisible)?.handleSecondaryClick()
+        let environment = ProcessInfo.processInfo.environment
+        let openDelay = Double(environment["FLIGGY_AGENTS_DEBUG_OPEN_ORBIT_DELAY"] ?? "") ?? 1.5
+        let closeDelay = Double(environment["FLIGGY_AGENTS_DEBUG_CLOSE_ORBIT_AFTER"] ?? "")
+        let soloCharacterIndex = Int(environment["FLIGGY_AGENTS_DEBUG_SOLO_CHARACTER_INDEX"] ?? "")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + openDelay) { [weak self] in
+            if let self, let soloCharacterIndex, let characters = self.controller?.characters {
+                for (index, character) in characters.enumerated() {
+                    character.setManuallyVisible(index == soloCharacterIndex)
+                }
+            }
+
+            guard let character = self?.controller?.characters.first(where: \.isManuallyVisible) else { return }
+            NSLog("FLIGGY_AGENTS_DEBUG_OPEN_ORBIT opening skill orbit")
+            character.handleSecondaryClick()
+
+            guard let closeDelay else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + closeDelay) { [weak self] in
+                guard let closingCharacter = self?.controller?.characters.first(where: \.isManuallyVisible) else { return }
+                NSLog("FLIGGY_AGENTS_DEBUG_OPEN_ORBIT closing skill orbit after %.3fs", closeDelay)
+                closingCharacter.handleSecondaryClick()
+            }
         }
     }
 
