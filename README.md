@@ -1,6 +1,6 @@
 # fliggy agents
 
-![fliggy agents](hero-thumbnail.png)
+
 
 Tiny AI companions that live on your macOS dock.
 
