@@ -105,6 +105,12 @@ final class ChatHistoryStore {
         }
     }
 
+    func loadSetupChecklistThread() -> ChatThread? {
+        loadAllThreads().first {
+            $0.provider == Self.reminderProvider && $0.titleSource == "setup"
+        }
+    }
+
     @discardableResult
     func appendReminderEvent(_ event: ReminderEvent) -> ChatThread {
         ReminderInboxStore.shared.record(event)
@@ -136,6 +142,21 @@ final class ChatHistoryStore {
                 outcomes: [.delivered]
             )
         )
+    }
+
+    @discardableResult
+    func upsertSetupChecklistThread(state: AssistantHealthState, updatedAt: Date = Date()) -> ChatThread {
+        var thread = loadSetupChecklistThread() ?? ChatThread(
+            title: "Setup Checklist",
+            titleSource: "setup",
+            provider: Self.reminderProvider,
+            messages: []
+        )
+        thread.title = "Setup Checklist"
+        thread.messages = [ChatHistoryMessage(role: .assistant, text: state.setupChecklistMessage())]
+        thread.updatedAt = updatedAt
+        upsert(thread: thread)
+        return thread
     }
 
     private func persist(_ threads: [ChatThread]) {

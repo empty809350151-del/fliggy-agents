@@ -135,6 +135,46 @@ class FliggyAgentsController {
         target?.openReminderInbox()
     }
 
+    func deliverSetupChecklistReminder(state: AssistantHealthState, title: String, body: String, deliveryKey: String) {
+        let updatedAt = Date()
+        let setupThread = ChatHistoryStore.shared.upsertSetupChecklistThread(state: state, updatedAt: updatedAt)
+        let activePopover = characters.first(where: { $0.isIdleForPopover && $0.isManuallyVisible && $0.window?.isVisible == true })
+        let target = reminderTargetCharacter()
+
+        let outcomes: [DeliveryOutcome]
+        if activePopover != nil || target != nil {
+            outcomes = [.skippedNoPermission, .delivered]
+        } else {
+            outcomes = [.skippedNoPermission, .skippedNoVisibleCharacter]
+        }
+
+        let event = ReminderEvent(
+            kind: .setupChecklist,
+            source: "Assistant Setup",
+            deliveryKey: deliveryKey,
+            bubbleTitle: title,
+            bubbleText: body,
+            fullText: body,
+            createdAt: updatedAt,
+            outcomes: outcomes,
+            metadata: ["thread_title": ReminderEvent.defaultInboxThreadTitle]
+        )
+        _ = ChatHistoryStore.shared.appendReminderEvent(event)
+
+        if let activePopover {
+            activePopover.noteProactiveHistoryUpdate()
+            return
+        }
+
+        guard let target else { return }
+        target.showExternalNotificationBubble(
+            title: title,
+            body: body,
+            duration: 30.0,
+            threadID: setupThread.id
+        )
+    }
+
     func showMirroredDingTalkNotification(_ notification: MirroredDingTalkNotification) {
         let activePopover = characters.first(where: { $0.isIdleForPopover && $0.isManuallyVisible && $0.window?.isVisible == true })
         let target = reminderTargetCharacter()

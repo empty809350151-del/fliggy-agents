@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private static let debugChatTranscriptDemoDefaultsKey = "debugChatTranscriptDemo"
     private static let debugOpenHistoryDrawerDefaultsKey = "debugOpenHistoryDrawer"
     private var hasRequestedAccessibilityPromptThisLaunch = false
+    private var hasPresentedDingTalkAccessibilityReminderThisLaunch = false
     private var currentProviderReadiness: ProviderReadiness = .unknown
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -430,6 +431,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let proactiveNeedsMonitor = proactiveCoordinator?.state.settings.requiresDingTalkMonitoring ?? false
         if !hasPermission, shouldMirrorDingTalkNotifications || proactiveNeedsMonitor {
             requestAccessibilityPermissionIfNeeded()
+            presentDingTalkAccessibilityReminderIfNeeded()
+        } else {
+            hasPresentedDingTalkAccessibilityReminderThisLaunch = false
         }
         let shouldEnable = hasPermission && (shouldMirrorDingTalkNotifications || proactiveNeedsMonitor)
         NSLog(
@@ -440,6 +444,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             shouldEnable.description
         )
         dingTalkNotificationMonitor?.setEnabled(shouldEnable)
+    }
+
+    private func presentDingTalkAccessibilityReminderIfNeeded() {
+        guard !hasPresentedDingTalkAccessibilityReminderThisLaunch else { return }
+        let state = currentHealthState()
+        guard state.requiresDingTalkMonitoring, !state.hasAccessibilityPermission else { return }
+
+        hasPresentedDingTalkAccessibilityReminderThisLaunch = true
+        controller?.deliverSetupChecklistReminder(
+            state: state,
+            title: "钉钉通知暂时没开",
+            body: "先给 fliggy agents 打开辅助功能权限，钉钉消息才能显示出来。",
+            deliveryKey: "setup-checklist-dingtalk-accessibility-blocked"
+        )
     }
 
     private func requestAccessibilityPermissionIfNeeded() {
